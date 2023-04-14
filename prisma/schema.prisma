@@ -10,11 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Download {
-  id        Int      @default(autoincrement()) @id
+model Event {
+  id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
-  url       String
-  filename  String
-  size      Int
   type      String
+  url       String
+  title     String
+  hostname  String
+  ip        String
 }

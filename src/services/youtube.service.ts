@@ -1,6 +1,6 @@
 import ytdl from 'ytdl-core';
 
-class YoutubeService {
+export class YoutubeService {
     static async getVideoInfo(videoURL: string) {
         const {
             player_response: {
@@ -13,10 +13,4 @@ class YoutubeService {
         };
     }
 
-    static async getVideoDownloadURL(videoURL: string) {
-        let info = await ytdl.getInfo(videoURL);
-        let format = ytdl.chooseFormat(info.formats, {quality: '134'});
-        console.log('Format found!', format);
-        return format.url;
-    }
 }

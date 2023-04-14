@@ -1,59 +1,61 @@
 import fastify from 'fastify';
+import {z, ZodError} from 'zod';
+import {YoutubeService} from './services/youtube.service';
+import {EventService} from "./services/event.service";
 import ytdl from 'ytdl-core';
 
 const app = fastify();
 
 app.get('/video/info', async (request, reply) => {
     try {
-        const {videoURL} = request.query;
-        const {
-            player_response: {
-                videoDetails: {title, author},
-            },
-        } = await ytdl.getBasicInfo(videoURL);
-        reply.status(200).send({
-            status: true,
-            title,
-            author,
+        console.log(request.hostname);
+        console.log(request.ip);
+        const urlSchema = z.object({
+            url: z.string().url()
         });
-        // next();
-    } catch (e) {
-        console.log(e);
+        const {url} = urlSchema.parse(request.query);
+        const info = await YoutubeService.getVideoInfo(url);
+        await EventService.registerInfo({
+            url,
+            title: info.title,
+            hostname: request.hostname,
+            ip: request.ip
+        });
+        reply.status(200).send(info);
+    } catch (error: ZodError | any) {
+        console.error(error);
+        if (error instanceof ZodError) {
+            const message = error.issues ? error.issues[0].message : 'Generic error';
+            reply.status(400).send(message);
+        }
+        reply.status(500).send('Internal server error');
     }
 });
 
 app.get('/video/download', async (request, reply) => {
     try {
-        const {
-            videoURL, downloadFormat, quality, title,
-        } = request.query;
-        // if (downloadFormat === 'audio-only') {
-
-        console.log('videoURL', videoURL)
-
-        let info = await ytdl.getInfo(videoURL);
-        let format = ytdl.chooseFormat(info.formats, {quality: '134'});
-        console.log('Format found!', format);
-        // console.log(info);
-
+        const downloadSchema = z.object({
+            url: z.string().url(),
+            title: z.string()
+        });
+        const {url, title} = downloadSchema.parse(request.query);
         reply.header('Content-Disposition', `attachment; filename=${title}.mp3`);
-
-        ytdl(videoURL, {
+        await EventService.registerDownload({
+            url,
+            title,
+            hostname: request.hostname,
+            ip: request.ip
+        });
+        ytdl(url, {
             filter: 'audioonly',
-            // quality: 'medium'
         }).pipe(reply.raw);
-        // } else {
-        //     res.header(
-        //         'Content-Disposition',
-        //         `attachment; filename="${title.substring(0, 25)}.mp4"`,
-        //     );
-        //     ytdl(videoURL, {
-        //         filter: downloadFormat === 'video-only' ? 'videoonly' : 'audioandvideo',
-        //         quality: quality === 'high' ? 'highestvideo' : 'lowestvideo',
-        //     }).pipe(res);
-        // }
-    } catch (e) {
-        console.log(e);
+    } catch (error: any) {
+        console.error(error);
+        if (error instanceof ZodError) {
+            const message = error.issues ? error.issues[0].message : 'Generic error';
+            reply.status(400).send(message);
+        }
+        reply.status(500).send('Internal server error');
     }
 });
 
