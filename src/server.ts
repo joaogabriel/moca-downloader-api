@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import {promisify} from 'util';
 import fastifyStatic from '@fastify/static';
+import fastifyCron from 'fastify-cron';
 
 const fastify = Fastify({
     logger: true
@@ -26,7 +27,19 @@ fastify.register(fastifyStatic, {
         res.setHeader('Content-Disposition', `attachment; filename=${pathBasenameFunction(path)}`);
         res.setHeader('Accept-Ranges', 'bytes');
     }
-})
+});
+
+fastify.register(fastifyCron, {
+    jobs: [
+        {
+            cronTime: "0 0 * * *",
+            onTick: async () => {
+                console.log('cleaning downloads dir');
+                readdirSync(downloadsDir).forEach((fileName) => unlinkSync(`${downloadsDir}/${fileName}`));
+            }
+        },
+    ],
+});
 
 fastify.get('/health', async (request, reply) => {
     reply.status(200).send('ok');
@@ -66,6 +79,7 @@ fastify.get('/video/download', async (request, reply) => {
         });
         const {url, title} = downloadSchema.parse(request.query);
         console.log(`video download request for ${title} from ${request.ip} (${request.hostname})`)
+        removeFileAfterMinute(title);
         await prepareDownloadPromise(url, title, reply);
     } catch (error: any) {
         console.error(error);
@@ -76,6 +90,15 @@ fastify.get('/video/download', async (request, reply) => {
         reply.status(500).send('Internal server error');
     }
 });
+
+const removeFileAfterMinute = (title: string) => {
+    const musicName = `${title}.mp3`;
+    setTimeout(async () => {
+        readdirSync(downloadsDir).forEach((fileName) =>
+            fileName === musicName ? unlinkSync(`${downloadsDir}/${fileName}`) : null
+        );
+    }, 60000);
+}
 
 // app.addHook('preHandler', (request, reply, done) => {
 //     console.log(request.url)
