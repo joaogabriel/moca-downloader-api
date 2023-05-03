@@ -1,8 +1,7 @@
-import Fastify, {FastifyReply} from 'fastify';
+import Fastify from 'fastify';
 import {z, ZodError} from 'zod';
 import {YoutubeService} from './services/youtube.service';
 import {EventService} from './services/event.service';
-import ytdl from 'ytdl-core';
 import path from 'path';
 import fs from 'fs';
 import {promisify} from 'util';
@@ -13,9 +12,9 @@ const fastify = Fastify({
 });
 const {readdirSync, unlinkSync, existsSync, mkdirSync} = fs;
 const pathBasenameFunction = path.basename;
-
-//create downloads dir if it does not exist
 const downloadsDir = './downloads';
+const prepareDownloadPromise = promisify(YoutubeService.prepareDownload);
+
 if (!existsSync(downloadsDir)) {
     mkdirSync(downloadsDir);
 }
@@ -58,79 +57,8 @@ fastify.get('/video/info', async (request, reply) => {
         reply.status(500).send('Internal server error');
     }
 });
-//
-// app.get('/video/download/prepare', async (request, reply) => {
-//     try {
-//         const downloadSchema = z.object({
-//             url: z.string().url(),
-//             title: z.string()
-//         });
-//         const {url, title} = downloadSchema.parse(request.query);
-//         await ytdl(url, {filter: 'audioonly'}).pipe(fs.createWriteStream(`./downloads/${title}.mp3`));
-//         return reply
-//             .send({title})
-//             .type('application/json')
-//             .code(200);
-//     } catch (error: any) {
-//         console.error(error);
-//         if (error instanceof ZodError) {
-//             const message = error.issues ? error.issues[0].message : 'Generic error';
-//             reply.status(400).send(message);
-//         }
-//         reply.status(500).send('Internal server error');
-//     }
-// });
-//
-// app.get('/video/download', async (request, reply) => {
-//     try {
-//         const downloadSchema = z.object({
-//             title: z.string()
-//         });
-//         const {title} = downloadSchema.parse(request.query);
-//         console.log(`video download request for ${title} from ${request.ip} (${request.hostname})`)
-//         return reply.download(
-//             `./downloads/${title}.mp3`,
-//             `${title}-download2.mp3`
-//         );
-//     } catch (error: any) {
-//         console.error(error);
-//         if (error instanceof ZodError) {
-//             const message = error.issues ? error.issues[0].message : 'Generic error';
-//             reply.status(400).send(message);
-//         }
-//         reply.status(500).send('Internal server error');
-//     }
-// });
-//
-//
-//
-//
-function downloadMP3(url: string, title: string, reply: FastifyReply) {
-    ytdl(url, {filter: 'audioonly'})
-        .pipe(fs.createWriteStream(`./downloads/${title}.mp3`))
-        .on("finish", async function () {
-            // reply.header('Content-Disposition', `attachment; filename=${title}-download.MP3`);
-            // reply.header('Accept-Ranges', 'bytes');
 
-            // reply.headers({
-            //     'Content-Type': 'audio/mpeg',
-            //     'Content-Disposition': `attachment; filename=download.mp3`,
-            //     'Accept-Ranges': 'bytes'
-            // })
-            // reply.header('Content-Type', 'audio/mpeg')
-            return reply.download(
-                `./downloads/${title}.mp3`,
-                `${title}-download.mp3`,
-                {
-                    extensions: ['mp3']
-                }
-            );
-        });
-}
-
-const pDownloadAndSend = promisify(downloadMP3);
-
-fastify.get('/video/download-v2', async (request, reply) => {
+fastify.get('/video/download', async (request, reply) => {
     try {
         const downloadSchema = z.object({
             url: z.string().url(),
@@ -138,7 +66,7 @@ fastify.get('/video/download-v2', async (request, reply) => {
         });
         const {url, title} = downloadSchema.parse(request.query);
         console.log(`video download request for ${title} from ${request.ip} (${request.hostname})`)
-        await pDownloadAndSend(url, title, reply);
+        await prepareDownloadPromise(url, title, reply);
     } catch (error: any) {
         console.error(error);
         if (error instanceof ZodError) {
