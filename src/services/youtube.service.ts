@@ -21,7 +21,7 @@ export class YoutubeService {
             .on("finish", async function () {
                 return reply.download(
                     `./downloads/${title}.mp3`,
-                    `${title}-download.mp3`,
+                    `${title}.mp3`,
                     {
                         extensions: ['mp3']
                     }
