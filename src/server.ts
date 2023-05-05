@@ -23,9 +23,15 @@ if (!existsSync(downloadsDir)) {
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../'),
     setHeaders: (res, path) => {
+        // const filePath = __dirname + '/public/file.mp3'
+
+        const fileStat = fs.statSync(path)
+        console.log(fileStat, path)
+
         res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', fileStat.size)
         res.setHeader('Content-Disposition', `attachment; filename=${pathBasenameFunction(path)}`);
-        res.setHeader('Accept-Ranges', 'bytes');
+        // res.setHeader('Accept-Ranges', 'bytes');
     }
 });
 
