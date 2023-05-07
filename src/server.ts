@@ -8,9 +8,7 @@ import {promisify} from 'util';
 import fastifyStatic from '@fastify/static';
 import fastifyCron from 'fastify-cron';
 
-const fastify = Fastify({
-    logger: true
-});
+const fastify = Fastify({logger: true});
 const {readdirSync, unlinkSync, existsSync, mkdirSync} = fs;
 const pathBasenameFunction = path.basename;
 const downloadsDir = './downloads';
@@ -23,15 +21,11 @@ if (!existsSync(downloadsDir)) {
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../'),
     setHeaders: (res, path) => {
-        // const filePath = __dirname + '/public/file.mp3'
-
         const fileStat = fs.statSync(path)
-        console.log(fileStat, path)
-
         res.setHeader('Content-Type', 'audio/mpeg');
         res.setHeader('Content-Length', fileStat.size)
         res.setHeader('Content-Disposition', `attachment; filename=${pathBasenameFunction(path)}`);
-        // res.setHeader('Accept-Ranges', 'bytes');
+        res.setHeader('Accept-Ranges', 'bytes');
     }
 });
 
@@ -86,6 +80,12 @@ fastify.get('/video/download', async (request, reply) => {
         const {url, title} = downloadSchema.parse(request.query);
         console.log(`video download request for ${title} from ${request.ip} (${request.hostname})`)
         removeFileAfterMinute(title);
+        await EventService.registerDownload({
+            url,
+            title,
+            hostname: request.hostname,
+            ip: request.ip
+        });
         await prepareDownloadPromise(url, title, reply);
     } catch (error: any) {
         console.error(error);
@@ -106,17 +106,16 @@ const removeFileAfterMinute = (title: string) => {
     }, 60000);
 }
 
-// app.addHook('preHandler', (request, reply, done) => {
-//     console.log(request.url)
-//     const {
-//         api_key
-//     } = request.headers;
-//     if (api_key === process.env.API_KEY) {
-//         done();
-//         return;
-//     }
-//     reply.code(401).send('Please provide a valid API key');
-// });
+fastify.addHook('preHandler', (request, reply, done) => {
+    const {
+        api_key
+    } = request.headers;
+    if (api_key === process.env.API_KEY) {
+        done();
+        return;
+    }
+    reply.code(401).send('Please provide a valid API key');
+});
 
 fastify.listen({
     host: '0.0.0.0',
